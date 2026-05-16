@@ -6,7 +6,6 @@ from models import db
 from models.user import Users
 from validation.authentication import (
     validate_email, 
-    validate_username, 
     validate_password, 
     validate_first_name, 
     validate_last_name
@@ -23,7 +22,6 @@ def perform_login(user, response_message):
             'message': response_message,
             'user': {
                 'id': user.id,
-                'username': user.username,
                 'email': user.email,
                 'firstName': user.first_name,
                 'lastName': user.last_name
@@ -44,7 +42,6 @@ def register():
         # Define validation methods
         VALIDATION_METHODS = {
             'email': validate_email,
-            'username': validate_username,
             'password': validate_password,
             'first_name': validate_first_name,
             'last_name': validate_last_name
@@ -58,18 +55,22 @@ def register():
                 return jsonify({ 'message': message }), 400
 
         new_user = Users(
-            username=data.get('username'),
             password=generate_password_hash(data.get('password')),
             email=data.get('email'),
             first_name=data.get('first_name'),
             last_name=data.get('last_name'),
-            created_at=datetime.now()
+            created_at=datetime.now(),
+            birthdate=data.get('birthdate'),
+            gender=data.get('gender'),
+            interested_in=data.get('interested_in'),
+            height_cm=data.get('height_cm'),
+            location=data.get('location')
         )
 
         db.session.add(new_user)
         db.session.commit()
 
-        user_to_login = Users.query.filter_by(username=new_user.username).first()
+        user_to_login = Users.query.filter_by(email=new_user.email).first()
 
         # Successful registration
         return perform_login(user_to_login, 'Welcome to TableTop!')
@@ -84,8 +85,7 @@ def login():
     try:
         data = request.get_json()
 
-        user = Users.query.filter_by(username=data.get('username')).first() or \
-               Users.query.filter_by(email=data.get('email')).first()
+        user = Users.query.filter_by(email=data.get('email')).first()
 
         if not user or not check_password_hash(user.password, data.get('password')):
             return jsonify({'message': 'Invalid credentials.'}), 401
