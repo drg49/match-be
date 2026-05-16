@@ -114,10 +114,34 @@ def logout():
         return jsonify({'message': 'Failed to log out.'}), 500
 
 
+def serialize_user(user):
+    return {
+        'id': user.id,
+        'email': user.email,
+        'phoneNumber': getattr(user, 'phone_number', None),
+        'firstName': user.first_name,
+        'lastName': user.last_name,
+        'bio': getattr(user, 'bio', None),
+        'birthdate': str(user.birthdate) if user.birthdate else None,
+        'gender': user.gender,
+        'interestedIn': user.interested_in,
+        'heightCm': user.height_cm,
+        'location': user.location,
+        'isActive': getattr(user, 'is_active', True),
+        'isVerified': getattr(user, 'is_verified', False)
+    }
+
 @authentication.route('/validate-user', methods=['GET'])
 @login_required
 def validate_user():
-    return jsonify({ 'message': 'User successfully validated.' }), 200
+    try:
+        return jsonify({ 
+            'message': 'User successfully validated.',
+            'user': serialize_user(current_user)
+        }), 200
+    except Exception as e:
+        print(f'An exception occurred during validation: {e}')
+        return jsonify({'message': 'Validation failed.'}), 500
 
 
 @authentication.route('/update-user', methods=['PUT'])
