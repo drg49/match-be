@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
-from flask_login import login_required, login_user, logout_user
+from flask_login import login_required, login_user, logout_user, current_user  # Added current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from models import db
@@ -118,3 +118,60 @@ def logout():
 @login_required
 def validate_user():
     return jsonify({ 'message': 'User successfully validated.' }), 200
+
+
+@authentication.route('/update-user', methods=['PUT'])
+@login_required
+def update_user():
+    try:
+        data = request.get_json() or {}
+        user = current_user  # Fetches the logged-in user context securely
+
+        # 1. Define validation methods for incoming data (if provided)
+        VALIDATION_METHODS = {
+            'email': validate_email,
+            'password': validate_password,
+            'first_name': validate_first_name,
+            'last_name': validate_last_name
+        }
+
+        # 2. Dynamic validation for updated fields
+        for key, method in VALIDATION_METHODS.items():
+            if key in data:
+                is_valid, message = method(data.get(key))
+                if not is_valid:
+                    return jsonify({ 'message': message }), 400
+
+        # 3. Handle Email Uniqueness checking if it's changing
+        if 'email' in data and data['email'] != user.email:
+            existing_email = Users.query.filter_by(email=data['email']).first()
+            if existing_email:
+                return jsonify({ 'message': 'Email is already taken.' }), 400
+            user.email = data['email']
+
+        # 4. Handle Password Hashing if it's changing
+        if 'password' in data:
+            user.password = generate_password_hash(data['password'])
+
+        # 5. Map and update other optional profile fields safely
+        profile_fields = ['first_name', 'last_name', 'birthdate', 'gender', 'interested_in', 'height_cm', 'location']
+        for field in profile_fields:
+            if field in data:
+                setattr(user, field, data[field])
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Profile updated successfully.',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'firstName': user.first_name,
+                'lastName': user.last_name
+            }
+        }), 200
+
+    except Exception as e:
+        print(f'An exception occurred during profile update: {e}')
+        db.session.rollback()
+        return jsonify({ 'message': 'Failed to update user profile.' }), 500
